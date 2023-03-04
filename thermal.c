@@ -1,15 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#define N 1000000
-
-double array[1024][1024];
-double arraynew[1024][1024];
-
-double maxv(double a, double b) {
-    if (a < b) return b;
-    return a;
-}
+#include <math.h>
+#include <string.h>
 
 
 int main(int argc, char** argv) {
@@ -19,60 +11,53 @@ int main(int argc, char** argv) {
     size = atoi(argv[2]);
     iternum = atoi(argv[3]);
 
-    accuracy = 0.0;
+    double* array = (double*)calloc(1024 * 1024, sizeof(double));
+    double* arraynew = (double*)calloc(1024 * 1024, sizeof(double));
 
-    array[0][0] = 10.0;
-    array[0][size-1] = 20.0;
-    array[size-1][size-1] = 30.0;
-    array[size-1][0] = 20.0;
 
-    arraynew[0][0] = 10.0;
-    arraynew[0][size - 1] = 20.0;
-    arraynew[size-1][size - 1] = 30.0;
-    arraynew[size-1][0] = 20.0;
+    array[0] = 10.0;
+    array[size-1] = 20.0;
+    array[(size-1) *size] = 20.0;
+    array[size * size-1] = 30.0;
+
+    arraynew[0] = 10.0;
+    arraynew[size - 1] = 20.0;
+    arraynew[(size - 1) * size] = 20.0;
+    arraynew[size * size - 1] = 30.0;
 
 
     double error = 1.0;
-    double step = 10.0 / size;
-    
-#pragma acc paralell loop vector vector_length(128) gang num_gangs(1024)
-    for (int i = 1; i < size; i++) {
-        array[0][i] = array[0][i - 1] + step;
-        array[i][0] = array[i - 1][0] + step;
-        array[size - 1][i] = array[size - 1][i - 1] + step;
-        array[i][size - 1] = array[i - 1][size - 1] + step;
-
-    }
+    double step = 10.0/(size-1);
 
     for (int i = 1; i < size; i++) {
-        arraynew[0][i] = arraynew[0][i - 1] + step;
-        arraynew[i][0] = arraynew[i - 1][0] + step;
-        arraynew[size - 1][i] = arraynew[size - 1][i - 1] + step;
-        arraynew[i][size - 1] = arraynew[i - 1][size - 1] + step;
-
+        array[i] = array[0] + step * i;
+        array[size * (size - 1) + i] = array[(size - 1) * size] + step*i;
+        array[(size * i)] = array[0] + step*i;
+        array[size - 1 + i * size] = array[size - 1] + step * i;
     }
 
+    memcpy(arraynew, array, size * size * sizeof(double));
 
-    int i = 0;
-     while((i < iternum) && (error > accuracy)){
-         error = 0;
-        for (int k = 1; k< size-1; k++) {
-            for (int j = 1; j < size-1; j++) {
-                arraynew[k][j] = 0.25 * (array[k + 1][j] + array[k - 1][j] + array[k][j - 1] + array[k][j + 1]);
-                error = maxv(error, arraynew[k][j]-array[k][j]);
+    int k = 0;
+    for (; (k < iternum) && (error > accuracy); k++) {
+        error = 0;
+        for (int i = 1; i < size - 1; i++) {
+            for (int j = 1; j < size - 1; j++) {
+                arraynew[j+i*(size)] = 0.25 * (array[j+(i+1)*(size)] + array[j+(i-1)*(size)] + array[j-1+i*(size)] + array[j+1+i*(size)]);
+                error = fmax(error, (arraynew[j+i*(size)] - array[j+i*(size)]));
             }
-        }
 
-        for (int k = 0;  k< size; k++) {
-            for (int j = 0; j < size; j++) {
-                array[k][j] = arraynew[k][j];
-            }
         }
-        i++;
+        double* temp = array;
+        array = arraynew;
+        arraynew = temp;
     }
+    printf("%d %lf\n", k, error);
 
-     printf("%d %lf", i, error);
+    free(array);
+    free(arraynew);
 
 
     return 0;
 }
+
