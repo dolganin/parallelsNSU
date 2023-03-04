@@ -36,21 +36,25 @@ int main(int argc, char** argv) {
         array[size - 1 + i * size] = array[size - 1] + step * i;
     }
 
-    memcpy(arraynew, array, size * size * sizeof(double));
-
     int k = 0;
+    memcpy(arraynew, array, size * size * sizeof(double));
+#pragma acc data enter copyin(array[0:size], arraynew[0:size], error)
+    {
+    
     for (; (k < iternum) && (error > accuracy); k++) {
         error = 0;
+#pragma acc pallel loop vector vector_length(256) gang num_gangs(128)
         for (int i = 1; i < size - 1; i++) {
             for (int j = 1; j < size - 1; j++) {
-                arraynew[j+i*(size)] = 0.25 * (array[j+(i+1)*(size)] + array[j+(i-1)*(size)] + array[j-1+i*(size)] + array[j+1+i*(size)]);
-                error = fmax(error, (arraynew[j+i*(size)] - array[j+i*(size)]));
+                arraynew[j + i * (size)] = 0.25 * (array[j + (i + 1) * (size)] + array[j + (i - 1) * (size)] + array[j - 1 + i * (size)] + array[j + 1 + i * (size)]);
+                error = fmax(error, (arraynew[j + i * (size)] - array[j + i * (size)]));
             }
 
         }
         double* temp = array;
         array = arraynew;
         arraynew = temp;
+        }
     }
     printf("%d %lf\n", k, error);
 
